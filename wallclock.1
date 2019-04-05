@@ -1,0 +1,44 @@
+.Dd 2019-04-05
+.Dt wallclock 1
+.Sh NAME
+.Nm wallclock
+.Nd X11 wall clock
+.Sh SYNOPSIS
+.Nm
+.Op Fl q
+.Op Fl v
+.Op Fl b Ar background color
+.Op Fl F f Ar font
+.Op Fl C c Ar color
+.Op Fl D d Ar strftime-format
+.Op Fl Y y Ar y-offset
+.Sh DESCRIPTION
+.Nm
+prints the time and date on the root window.
+
+.Sh OPTIONS
+Uppercase and lowercase arguments affect the
+upper and lower rows of text, respectively.
+.Bl -tag -width Ds
+.It Fl v
+Increase verbosity.
+.It Fl q
+Descrease verbosity.
+
+.It Fl F f Ar font
+Set font. See also
+.Xr fc-list 1 .
+.It Fl C c Ar color
+Set color. See also
+.Xr showrgb 1 .
+.It Fl D d Ar timefmt
+Ar Set time format. See also
+.Xr strftime 3 .
+.It Fl Y y Ar vertical offset
+Set vertical offset.
+
+.Sh AUTHOR
+Written by Lars Lindqvist.
+
+.Sh SEE ALSO
+.Xr conky 8 .

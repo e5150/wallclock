@@ -1,0 +1,43 @@
+wallclock(1)                General Commands Manual               wallclock(1)
+
+NAME
+     wallclock - X11 wall clock
+
+SYNOPSIS
+     wallclock [-q] [-v] [-b background color] [-F -f font] [-C -c color]
+               [-D -d strftime-format] [-Y -y y-offset]
+
+DESCRIPTION
+     wallclock prints the time and date on the root window.
+
+
+OPTIONS
+     Uppercase and lowercase arguments affect the upper and lower rows of
+     text, respectively.
+
+     -v      Increase verbosity.
+
+     -q      Descrease verbosity.
+
+
+     -F -f font
+             Set font. See also fc-list(1).
+
+     -C -c color
+             Set color. See also showrgb(1).
+
+     -D -d timefmt
+             Ar Set time format. See also strftime(3).
+
+     -Y -y vertical offset
+             Set vertical offset.
+
+
+AUTHOR
+     Written by Lars Lindqvist.
+
+
+SEE ALSO
+     conky(8).
+
+                                  2019-04-05
