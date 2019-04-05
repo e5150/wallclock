@@ -102,6 +102,13 @@ initline(struct line_t *line, const struct linearg_t *arg) {
 	line->ascent = line->xfont->ascent;
 	line->height = line->xfont->ascent + line->xfont->descent;
 	line->fwidth = line->xfont->max_advance_width;
+	if (args.debug > 1) {
+		printf("%s:\n", arg->font);
+		printf("  a: %d\n", line->xfont->ascent);
+		printf("  d: %d\n", line->xfont->descent);
+		printf("  w: %d\n", line->fwidth);
+		printf("  h: %d\n", line->height);
+	}
 	if (line->fwidth > textnw(line->xfont, "0", 1) * 1.5) {
 		if (args.debug > 0) {
 			warnx("Using non-monospaced font: %s", arg->font);
@@ -145,15 +152,15 @@ setup() {
 	XSelectInput(dc.dpy, dc.root, ExposureMask);
 }
 
-static void
-drawtext(struct line_t *line, struct tm *tmp) {
+static bool
+drawtext(struct line_t *line, struct tm *tmp, bool force) {
 	char buf[64] = { 0 };
 	if (!strftime(buf, sizeof(buf), line->arg->fmt, tmp)) {
 		err(1, "ERROR strftime %s", line->arg->fmt);
 	}
-	if (!strcmp(buf, line->buf)) {
+	if (!force && !strcmp(buf, line->buf)) {
 		/* no need to redraw */
-		return;
+		return false;
 	}
 	size_t len = strlen(buf);
 	int w = line->fwidth * len;
@@ -170,19 +177,20 @@ drawtext(struct line_t *line, struct tm *tmp) {
 	}
 
 	XSetForeground(dc.dpy, dc.gc, args.debug > 2 ? 0x302030 : dc.bg.pixel);
-	XFillRectangle(dc.dpy, dc.da, dc.gc, (dc.w - w) / 2, line->y, w + ew, line->height);
+	XFillRectangle(dc.dpy, dc.da, dc.gc, (dc.w - w - ew) / 2, line->y, w + ew, line->height);
 
 	XftDraw *draw = XftDrawCreate(dc.dpy, dc.da, DefaultVisual(dc.dpy, dc.screen), dc.cmap);
 
 	XftDrawStringUtf8(draw,
 	                  &line->color,
 	                  line->xfont,
-	                  (dc.w - w + ew) / 2,
+	                  (dc.w - w) / 2,
 	                  line->y + line->ascent,
 	                  (XftChar8*)buf,
 	                  len);
 	XftDrawDestroy(draw);
 	strncpy(line->buf, buf, sizeof(line->buf));
+	return true;
 }
 
 static void
@@ -190,11 +198,12 @@ draw(bool dirty) {
 	if (dirty) {
 		time_t t = time(NULL);
 		struct tm *tmp;
+		bool force = false;
 		if (!(tmp = localtime(&t))) {
 			err(1, "ERROR: localtime");
 		}
-		drawtext(&dc.text1, tmp);
-		drawtext(&dc.text2, tmp);
+		force = drawtext(&dc.text1, tmp, force);
+		force = drawtext(&dc.text2, tmp, force);
 	}
 	XCopyArea(dc.dpy, dc.da, dc.root, dc.gc, 0, 0, dc.w, dc.h, 0, 0);
 	XSync(dc.dpy, 0);
@@ -202,7 +211,6 @@ draw(bool dirty) {
 
 static void
 catch(int signal) {
-	printf("caught %d\n", signal);
 	running = false;
 }
 
