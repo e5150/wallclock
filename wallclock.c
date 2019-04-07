@@ -84,6 +84,7 @@ static struct {
 	GC gc;
 	Drawable da;
 	Colormap cmap;
+	Visual *vis;
 	struct line_t text1, text2;
 } dc;
 
@@ -115,11 +116,7 @@ initline(struct line_t *line, const struct linearg_t *arg) {
 		}
 		line->fwidth = 0;
 	}
-	if (!XftColorAllocName(dc.dpy,
-	                       DefaultVisual(dc.dpy, dc.screen),
-	                       DefaultColormap(dc.dpy, dc.screen),
-	                       arg->color,
-	                       &line->color)) {
+	if (!XftColorAllocName(dc.dpy, dc.vis, dc.cmap, arg->color, &line->color)) {
 		errx(1, "Cannot load color: %s", arg->color);
 	}
 	line->warned = false;
@@ -137,9 +134,11 @@ setup() {
 	dc.h = DisplayHeight(dc.dpy, dc.screen);
 	dc.root = RootWindow(dc.dpy, dc.screen);
 	dc.cmap = DefaultColormap(dc.dpy, dc.screen);
+	dc.vis = DefaultVisual(dc.dpy, dc.screen);
 	dc.da = XCreatePixmap(dc.dpy, dc.root, dc.w, dc.h, DefaultDepth(dc.dpy, dc.screen));
-	dc.gc = XCreateGC(dc.dpy, dc.root, 0, 0);
-	if (!XAllocNamedColor(dc.dpy, DefaultColormap(dc.dpy, dc.screen), args.background, &dc.bg, &dc.bg)) {
+	XGCValues gcv = { 0 };
+	dc.gc = XCreateGC(dc.dpy, dc.root, GCGraphicsExposures, &gcv);
+	if (!XAllocNamedColor(dc.dpy, dc.cmap, args.background, &dc.bg, &dc.bg)) {
 		errx(1, "Cannot load color: %s", args.background);
 	}
 	initline(&dc.text1, &args.text1);
@@ -179,7 +178,7 @@ drawtext(struct line_t *line, struct tm *tmp, bool force) {
 	XSetForeground(dc.dpy, dc.gc, args.debug > 2 ? 0x302030 : dc.bg.pixel);
 	XFillRectangle(dc.dpy, dc.da, dc.gc, (dc.w - w - ew) / 2, line->y, w + ew, line->height);
 
-	XftDraw *draw = XftDrawCreate(dc.dpy, dc.da, DefaultVisual(dc.dpy, dc.screen), dc.cmap);
+	XftDraw *draw = XftDrawCreate(dc.dpy, dc.da, dc.vis, dc.cmap);
 
 	XftDrawStringUtf8(draw,
 	                  &line->color,
@@ -218,8 +217,8 @@ static void
 cleanup() {
 	XClearWindow(dc.dpy, dc.root);
 	XFreePixmap(dc.dpy, dc.da);
-	XftColorFree(dc.dpy, DefaultVisual(dc.dpy, dc.screen), dc.cmap, &dc.text1.color);
-	XftColorFree(dc.dpy, DefaultVisual(dc.dpy, dc.screen), dc.cmap, &dc.text2.color);
+	XftColorFree(dc.dpy, dc.vis, dc.cmap, &dc.text1.color);
+	XftColorFree(dc.dpy, dc.vis, dc.cmap, &dc.text2.color);
 	XFreeGC(dc.dpy, dc.gc);
 	XCloseDisplay(dc.dpy);
 }
