@@ -4,7 +4,7 @@ CFLAGS  += -Wwrite-strings -Wdate-time
 CFLAGS  += -Wunused -Wno-unused-parameter
 CFLAGS  += -Wshadow -Wstrict-overflow -fno-strict-aliasing
 CFLAGS  += -D_XOPEN_SOURCE=700 -D_DEFAULT_SOURCE
-CFLAGS  += -lX11 $(shell pkg-config --cflags xft)
+CFLAGS  += -lX11 -lXinerama $(shell pkg-config --cflags xft)
 LDFLAGS  = $(shell pkg-config --libs xft)
 
 CC      ?= gcc

@@ -19,6 +19,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
+#include <X11/extensions/Xinerama.h>
 #include <X11/Xft/Xft.h>
 #include <X11/Xutil.h>
 #include <err.h>
@@ -44,6 +45,7 @@ static struct {
 	struct linearg_t text1, text2;
 	const char *background;
 	int debug;
+	int screen;
 } args = {
 	.text1 = {
 		.fmt   = "%H:%M",
@@ -59,6 +61,7 @@ static struct {
 	},
 	.background = "#000000",
 	.debug = 1,
+	.screen = -1,
 };
 
 static bool running = true;
@@ -80,6 +83,7 @@ static struct {
 	Display *dpy;
 	int screen;
 	Window root;
+	int x, y;
 	int w, h;
 	GC gc;
 	Drawable da;
@@ -130,11 +134,37 @@ setup() {
 		errx(1, "Cannot open display");
 	}
 	dc.screen = DefaultScreen(dc.dpy);
+	dc.x = 0;
+	dc.y = 0;
 	dc.w = DisplayWidth(dc.dpy, dc.screen);
 	dc.h = DisplayHeight(dc.dpy, dc.screen);
 	dc.root = RootWindow(dc.dpy, dc.screen);
 	dc.cmap = DefaultColormap(dc.dpy, dc.screen);
 	dc.vis = DefaultVisual(dc.dpy, dc.screen);
+	if (XineramaIsActive(dc.dpy)) {
+		int n, i = 0;
+		XineramaScreenInfo *info = XineramaQueryScreens(dc.dpy, &n);
+		if (args.screen != -1) {
+			if (args.screen >= n) {
+				errx(1, "%d exceeds the number of screens (%d)", args.screen, n);
+			}
+			i = args.screen;
+		} else {
+			for (i = 0; i < n; ++i) {
+				if (info[i].x_org == 0) {
+					break;
+				}
+			}
+		}
+		dc.x = info[i].x_org;
+		dc.y = info[i].y_org;
+		dc.w = info[i].width;
+		dc.h = info[i].height;
+		XFree(info);
+	}
+	if (args.debug > 1) {
+		printf("x=%d y=%d w=%d h=%d\n", dc.x, dc.y, dc.w, dc.h);
+	}
 	dc.da = XCreatePixmap(dc.dpy, dc.root, dc.w, dc.h, DefaultDepth(dc.dpy, dc.screen));
 	XGCValues gcv = { 0 };
 	dc.gc = XCreateGC(dc.dpy, dc.root, GCGraphicsExposures, &gcv);
@@ -225,7 +255,7 @@ cleanup() {
 
 static void
 usage() {
-	printf("usage: [-b background] [-Ff font] [-Cc color] [-Dd datefmt] [-Yy y-offset]\n");
+	printf("usage: [-s screen] [-b background] [-Ff font] [-Cc color] [-Dd datefmt] [-Yy y-offset]\n");
 	exit(1);
 }
 
@@ -234,6 +264,9 @@ main(int argc, char *argv[]) {
 	bool background = true;
 
 	ARGBEGIN {
+	case 's':
+		args.screen = atoi(EARGF(usage()));
+		break;
 	case 'q':
 		--args.debug;
 		break;
