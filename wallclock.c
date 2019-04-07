@@ -176,7 +176,7 @@ setup() {
 	dc.text1.y = (dc.h - dc.text1.height - dc.text2.height) / 2 + args.text1.dy;
 	dc.text2.y = dc.text1.y + dc.text1.height + args.text2.dy;
 	XSetForeground(dc.dpy, dc.gc, dc.bg.pixel);
-	XFillRectangle(dc.dpy, dc.da, dc.gc, 0, 0, dc.w, dc.h);
+	XFillRectangle(dc.dpy, dc.da, dc.gc, dc.x, dc.y, dc.w, dc.h);
 
 	XSelectInput(dc.dpy, dc.root, ExposureMask);
 }
@@ -234,7 +234,7 @@ draw(bool dirty) {
 		force = drawtext(&dc.text1, tmp, force);
 		force = drawtext(&dc.text2, tmp, force);
 	}
-	XCopyArea(dc.dpy, dc.da, dc.root, dc.gc, 0, 0, dc.w, dc.h, 0, 0);
+	XCopyArea(dc.dpy, dc.da, dc.root, dc.gc, 0, 0, dc.w, dc.h, dc.x, dc.y);
 	XSync(dc.dpy, 0);
 }
 
