@@ -71,7 +71,7 @@ struct line_t {
 	int y;
 	int ascent;
 	int height;
-	int fwidth;
+	int margin;
 	bool warned;
 	XftFont *xfont;
 	XftColor color;
@@ -96,7 +96,7 @@ static int
 textnw(XftFont *xfont, const char *text, int len) {
         XGlyphInfo ext;
         XftTextExtentsUtf8(dc.dpy, xfont, (FcChar8*)text, len, &ext);
-        return ext.width;
+        return ext.xOff;
 }
 
 static void
@@ -106,19 +106,13 @@ initline(struct line_t *line, const struct linearg_t *arg) {
 	}
 	line->ascent = line->xfont->ascent;
 	line->height = line->xfont->ascent + line->xfont->descent;
-	line->fwidth = line->xfont->max_advance_width;
+	line->margin = textnw(line->xfont, "0", 1) / 4;
 	if (args.debug > 1) {
 		printf("%s:\n", arg->font);
 		printf("  a: %d\n", line->xfont->ascent);
 		printf("  d: %d\n", line->xfont->descent);
-		printf("  w: %d\n", line->fwidth);
 		printf("  h: %d\n", line->height);
-	}
-	if (line->fwidth > textnw(line->xfont, "0", 1) * 1.5) {
-		if (args.debug > 0) {
-			warnx("Using non-monospaced font: %s", arg->font);
-		}
-		line->fwidth = 0;
+		printf("  m: %d\n", line->margin);
 	}
 	if (!XftColorAllocName(dc.dpy, dc.vis, dc.cmap, arg->color, &line->color)) {
 		errx(1, "Cannot load color: %s", arg->color);
@@ -127,6 +121,59 @@ initline(struct line_t *line, const struct linearg_t *arg) {
 	line->arg = arg;
 }
 
+static bool
+drawtext(struct line_t *line, struct tm *tmp, bool force) {
+	char buf[64] = { 0 };
+	if (!strftime(buf, sizeof(buf), line->arg->fmt, tmp)) {
+		err(1, "ERROR strftime %s", line->arg->fmt);
+	}
+	if (!force && !strcmp(buf, line->buf)) {
+		/* no need to redraw */
+		return false;
+	}
+	/* non-monospaced */
+	size_t len = strlen(buf);
+	int w = textnw(line->xfont, buf, len);
+
+	if (!line->warned && w > dc.w) {
+		line->warned = true;
+		warnx("Excessive width %d for '%s' using font %s", w, buf, line->arg->font);
+	}
+
+	XSetForeground(dc.dpy, dc.gc, args.debug > 2 ? 0x302030 : dc.bg.pixel);
+	XFillRectangle(dc.dpy, dc.da, dc.gc,
+	               (dc.w - w) / 2 - line->margin,
+	               line->y,
+	               w + 2 * line->margin,
+	               line->height);
+
+	XftDraw *draw = XftDrawCreate(dc.dpy, dc.da, dc.vis, dc.cmap);
+
+	XftDrawStringUtf8(draw,
+	                  &line->color,
+	                  line->xfont,
+	                  (dc.w - w) / 2,
+	                  line->y + line->ascent,
+	                  (XftChar8*)buf,
+	                  len);
+	XftDrawDestroy(draw);
+	strncpy(line->buf, buf, sizeof(line->buf));
+	return true;
+}
+
+static bool
+draw() {
+	time_t t = time(NULL);
+	struct tm *tmp;
+	bool dirty = false;
+	if (!(tmp = localtime(&t))) {
+		err(1, "ERROR: localtime");
+	}
+	dirty = drawtext(&dc.text1, tmp, dirty);
+	dirty = drawtext(&dc.text2, tmp, dirty);
+	XSync(dc.dpy, 0);
+	return dirty;
+}
 
 static void
 setup() {
@@ -171,6 +218,7 @@ setup() {
 	if (!XAllocNamedColor(dc.dpy, dc.cmap, args.background, &dc.bg, &dc.bg)) {
 		errx(1, "Cannot load color: %s", args.background);
 	}
+
 	initline(&dc.text1, &args.text1);
 	initline(&dc.text2, &args.text2);
 	dc.text1.y = (dc.h - dc.text1.height - dc.text2.height) / 2 + args.text1.dy;
@@ -178,64 +226,11 @@ setup() {
 	XSetForeground(dc.dpy, dc.gc, dc.bg.pixel);
 	XFillRectangle(dc.dpy, dc.da, dc.gc, dc.x, dc.y, dc.w, dc.h);
 
-	XSelectInput(dc.dpy, dc.root, ExposureMask);
-}
-
-static bool
-drawtext(struct line_t *line, struct tm *tmp, bool force) {
-	char buf[64] = { 0 };
-	if (!strftime(buf, sizeof(buf), line->arg->fmt, tmp)) {
-		err(1, "ERROR strftime %s", line->arg->fmt);
-	}
-	if (!force && !strcmp(buf, line->buf)) {
-		/* no need to redraw */
-		return false;
-	}
-	size_t len = strlen(buf);
-	int w = line->fwidth * len;
-	int ew = 0;
-	if (!w) {
-		/* non-monospaced */
-		w = textnw(line->xfont, buf, len);
-		ew = w / 8;
-	}
-
-	if (!line->warned && w + ew > dc.w) {
-		line->warned = true;
-		warnx("Excessive width %d for '%s' using font %s", w + ew, buf, line->arg->font);
-	}
-
-	XSetForeground(dc.dpy, dc.gc, args.debug > 2 ? 0x302030 : dc.bg.pixel);
-	XFillRectangle(dc.dpy, dc.da, dc.gc, (dc.w - w - ew) / 2, line->y, w + ew, line->height);
-
-	XftDraw *draw = XftDrawCreate(dc.dpy, dc.da, dc.vis, dc.cmap);
-
-	XftDrawStringUtf8(draw,
-	                  &line->color,
-	                  line->xfont,
-	                  (dc.w - w) / 2,
-	                  line->y + line->ascent,
-	                  (XftChar8*)buf,
-	                  len);
-	XftDrawDestroy(draw);
-	strncpy(line->buf, buf, sizeof(line->buf));
-	return true;
-}
-
-static void
-draw(bool dirty) {
-	if (dirty) {
-		time_t t = time(NULL);
-		struct tm *tmp;
-		bool force = false;
-		if (!(tmp = localtime(&t))) {
-			err(1, "ERROR: localtime");
-		}
-		force = drawtext(&dc.text1, tmp, force);
-		force = drawtext(&dc.text2, tmp, force);
-	}
+	draw();
 	XCopyArea(dc.dpy, dc.da, dc.root, dc.gc, 0, 0, dc.w, dc.h, dc.x, dc.y);
 	XSync(dc.dpy, 0);
+
+	XSelectInput(dc.dpy, dc.root, ExposureMask);
 }
 
 static void
@@ -332,7 +327,6 @@ main(int argc, char *argv[]) {
 	}
 
 	setup();
-	draw(true);
 
 	struct pollfd pfd = {
 		.fd = ConnectionNumber(dc.dpy),
@@ -340,15 +334,20 @@ main(int argc, char *argv[]) {
 	};
 
 	while (running) {
+		bool dirty = false;
 		switch(poll(&pfd, 1, 1000)) {
 		case -1:
 			warn("ERROR: poll");
 			break;
 		case 0:
-			draw(true);
+			dirty = draw();
 			break;
 		default:
-			draw(false);
+			dirty = true;
+		}
+		if (dirty) {
+			XCopyArea(dc.dpy, dc.da, dc.root, dc.gc, 0, 0, dc.w, dc.h, dc.x, dc.y);
+			XSync(dc.dpy, 0);
 		}
 	}
 
