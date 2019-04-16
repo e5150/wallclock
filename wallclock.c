@@ -106,7 +106,7 @@ initline(struct line_t *line, const struct linearg_t *arg) {
 	}
 	line->ascent = line->xfont->ascent;
 	line->height = line->xfont->ascent + line->xfont->descent;
-	line->margin = textnw(line->xfont, "0", 1) / 4;
+	line->margin = textnw(line->xfont, "0", 1) / 2;
 	if (args.debug > 1) {
 		printf("%s:\n", arg->font);
 		printf("  a: %d\n", line->xfont->ascent);
@@ -226,11 +226,12 @@ setup() {
 	XSetForeground(dc.dpy, dc.gc, dc.bg.pixel);
 	XFillRectangle(dc.dpy, dc.da, dc.gc, dc.x, dc.y, dc.w, dc.h);
 
+	XSelectInput(dc.dpy, dc.root, ExposureMask);
+
 	draw();
 	XCopyArea(dc.dpy, dc.da, dc.root, dc.gc, 0, 0, dc.w, dc.h, dc.x, dc.y);
 	XSync(dc.dpy, 0);
 
-	XSelectInput(dc.dpy, dc.root, ExposureMask);
 }
 
 static void
