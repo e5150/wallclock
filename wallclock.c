@@ -71,7 +71,6 @@ struct line_t {
 	int y;
 	int ascent;
 	int height;
-	int margin;
 	bool warned;
 	XftFont *xfont;
 	XftColor color;
@@ -106,13 +105,11 @@ initline(struct line_t *line, const struct linearg_t *arg) {
 	}
 	line->ascent = line->xfont->ascent;
 	line->height = line->xfont->ascent + line->xfont->descent;
-	line->margin = textnw(line->xfont, "0", 1) / 2;
 	if (args.debug > 1) {
 		printf("%s:\n", arg->font);
 		printf("  a: %d\n", line->xfont->ascent);
 		printf("  d: %d\n", line->xfont->descent);
 		printf("  h: %d\n", line->height);
-		printf("  m: %d\n", line->margin);
 	}
 	if (!XftColorAllocName(dc.dpy, dc.vis, dc.cmap, arg->color, &line->color)) {
 		errx(1, "Cannot load color: %s", arg->color);
@@ -141,11 +138,7 @@ drawtext(struct line_t *line, struct tm *tmp, bool force) {
 	}
 
 	XSetForeground(dc.dpy, dc.gc, args.debug > 2 ? 0x302030 : dc.bg.pixel);
-	XFillRectangle(dc.dpy, dc.da, dc.gc,
-	               (dc.w - w) / 2 - line->margin,
-	               line->y,
-	               w + 2 * line->margin,
-	               line->height);
+	XFillRectangle(dc.dpy, dc.da, dc.gc, dc.x, line->y, dc.w, line->height);
 
 	XftDraw *draw = XftDrawCreate(dc.dpy, dc.da, dc.vis, dc.cmap);
 
@@ -257,7 +250,7 @@ usage() {
 
 int
 main(int argc, char *argv[]) {
-	bool background = true;
+	bool daemonize = true;
 
 	ARGBEGIN {
 	case 's':
@@ -297,13 +290,13 @@ main(int argc, char *argv[]) {
 		args.text2.dy = atoi(EARGF(usage()));
 		break;
 	case 'x':
-		background = false;
+		daemonize = false;
 		break;
 	default:
 		usage();
 	} ARGEND;
 
-	if (background) {
+	if (daemonize) {
 		switch (fork()) {
 		case -1:
 			err(1, "ERROR: fork");
